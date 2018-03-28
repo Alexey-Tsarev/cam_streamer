@@ -1,0 +1,11 @@
+# pip install -r requirements.txt
+
+config
+requests
+schedule
+glob2
+psutil
+sortedcontainers
+daemon
+python-daemon
+argparse
