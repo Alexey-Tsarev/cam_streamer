@@ -252,13 +252,16 @@ class Cam:
             self.log.debug('Sorted files list (with last modification date): %s' % store_file_list_sorted)
             self.log.debug('Sorted files list (by last modification date): %s' % store_file_list_sorted.values())
 
-            for file_number, file_name in enumerate(store_file_list_sorted.values()):
-                if file_number == int(self.cfg['cleaner_max_removes_per_run']):
-                    self.log.debug('Max removes reached: ' + self.cfg['cleaner_max_removes_per_run'])
-                    break
+            removes = 0
+            for file_name in store_file_list_sorted.values():
+                if os.path.isfile(file_name):
+                    self.log.info('Remove file: ' + file_name)
+                    os.remove(file_name)
+                    removes += 1
 
-                self.log.info('Remove file: ' + file_name)
-                os.remove(file_name)
+                    if removes == int(self.cfg['cleaner_max_removes_per_run']):
+                        self.log.debug('Max removes reached: ' + self.cfg['cleaner_max_removes_per_run'])
+                        break
 
         self.log.debug('Cleaner finished')
 

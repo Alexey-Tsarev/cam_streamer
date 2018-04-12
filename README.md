@@ -58,7 +58,7 @@ In the above example there are 3 USB cameras with the following parameters:
 1498 pid:  640x480 h264 video, no audio
 ~~~
 
-Mostly the same for Raspberry Pi 3
+Mostly the same for Raspberry Pi 3:
 ~~~
 $ grep Revision /proc/cpuinfo
 Revision        : a22082
