@@ -306,7 +306,7 @@ class Cam:
         # End Read cam configs
 
         # Cleaner
-        self.cfg['cleaner_max_removes_per_run'] = self.replacer(self.cfg['cleaner_max_removes_per_run'], 0)
+        self.cfg['cleaner_max_removes_per_run'] = self.replacer(str(self.cfg['cleaner_max_removes_per_run']), 0)
         schedule.every(self.cfg['cleaner_run_every_minutes']).minutes.do(self.cleaner)
         # End Cleaner
 
