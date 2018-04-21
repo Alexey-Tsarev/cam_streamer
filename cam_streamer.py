@@ -344,7 +344,11 @@ class Cam:
                 if len(self.cam_streamer) == iterator:
                     cap_dir_cam = self.replacer(self.cfg['cap_dir_cam'], iterator)
                     if not os.path.exists(cap_dir_cam):
-                        os.makedirs(cap_dir_cam)
+                        try:
+                            os.makedirs(cap_dir_cam)
+                        except OSError:
+                            self.log.critical('Failed to create directory: ' + cap_dir_cam)
+                            sys.exit(1)
 
                     self.cam_streamer_start_flag.append(True)
 
