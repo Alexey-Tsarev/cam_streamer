@@ -154,7 +154,10 @@ class Cam:
 
                 if psutil.pid_exists(pid):
                     self.log.debug('Kill process: %i' % pid)
-                    os.kill(pid, signal.SIGTERM)
+                    try:
+                        os.kill(pid, signal.SIGTERM)
+                    except OSError:
+                        self.log.warn('Failed to kill process: %i' % pid)
                 else:
                     self.log.info('Process not found: %i' % pid)
             else:
