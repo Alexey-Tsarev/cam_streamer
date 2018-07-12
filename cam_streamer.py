@@ -258,9 +258,14 @@ class Cam:
             removes = 0
             for file_name in store_file_list_sorted.values():
                 if os.path.isfile(file_name):
+                    file_size = os.path.getsize(file_name)
                     self.log.info('Remove file: ' + file_name)
                     os.remove(file_name)
-                    removes += 1
+
+                    if file_size > int(self.cfg['cleaner_force_remove_file_less_bytes']):
+                        removes += 1
+                    else:
+                        self.log.warn('Removed "%s" file with the "%s" bytes size' % (file_name, file_size))
 
                     if removes == int(self.cfg['cleaner_max_removes_per_run']):
                         self.log.debug('Max removes reached: ' + self.cfg['cleaner_max_removes_per_run'])
