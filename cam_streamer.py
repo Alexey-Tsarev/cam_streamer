@@ -23,6 +23,7 @@ cfg_filename = 'main.cfg'
 class Cam:
     cfg = Config()
     cam_cfg = []
+    cam_cfg_resolver_dict = {}
     cam_streamer = []
     cam_streamer_pid = []
     cam_streamer_start_time = []
@@ -273,6 +274,10 @@ class Cam:
 
         self.log.debug('Cleaner finished')
 
+    def configs_resolver(self, map1, map2, key):
+        self.cam_cfg_resolver_dict[key] = map1[key]
+        return "overwrite"
+
     def main(self):
         self.log.info('Start')
         self.log.debug('Started: ' + os.path.abspath(__file__))
@@ -306,8 +311,13 @@ class Cam:
 
             if cur_cam_cfg_active_flag:
                 self.cam_cfg.append(tmp_cfg)
-                merger = ConfigMerger()
+                self.cam_cfg_resolver_dict.clear()
+                merger = ConfigMerger(resolver=self.configs_resolver)
                 merger.merge(self.cam_cfg[-1], self.cfg)
+
+                for key in self.cam_cfg_resolver_dict:
+                    self.cam_cfg[-1][key] = self.cam_cfg_resolver_dict[key]
+
                 self.log.debug('Loaded settings for: ' + self.cam_cfg[-1]['name'])
             else:
                 self.log.debug('Cam config is skipped due active flag: ' + cur_cam_cfg)
@@ -388,7 +398,7 @@ class Cam:
 
                 # Run streamer
                 if self.cam_streamer_start_flag[iterator]:
-                    self.log.info('Run "%s" in background' % cam['name'])
+                    self.log.info('Run "%s" streamer in background' % cam['name'])
                     self.cam_streamer[iterator] = self.bg_run(cam['cmd'].strip(), self.cam_streamer_pid[iterator])
                     self.cam_streamer_start_time[iterator] = time.time()
                     self.cam_streamer_poll_flag[iterator] = True
@@ -443,12 +453,15 @@ class Cam:
                                 self.log.critical('Capture command not found. Exit')
                                 self.exit_handler(None, None, log_signal=False, exit_code=1)
 
-                        cap_cmd = self.replacer(cap_cmd, iterator)
+                        if cap_cmd is not False:
+                            cap_cmd = self.replacer(cap_cmd, iterator)
 
-                        self.log.info('Running capturer for: ' + cam['name'])
-                        self.cam_capturer[iterator] = self.bg_run(cap_cmd, self.cam_capturer_pid[iterator])
+                            self.log.info('Run "%s" capturer in background' % cam['name'])
+                            self.cam_capturer[iterator] = self.bg_run(cap_cmd, self.cam_capturer_pid[iterator])
+                            self.cam_capturer_check_flag[iterator] = True
+                        else:
+                            self.log.info('Capturer "%s" is turned off' % cam['name'])
 
-                    self.cam_capturer_check_flag[iterator] = True
                     self.cam_capturer_start_flag[iterator] = False
                 # End Run capturer
 
