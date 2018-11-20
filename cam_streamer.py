@@ -360,13 +360,23 @@ class Cam:
         while self.main_loop_active_flag:
             for iterator, cam in enumerate(self.cam_cfg):
                 if len(self.cam_streamer) == iterator:
-                    cap_dir_cam = self.replacer(self.cfg['cap_dir_cam'], iterator)
-                    if not os.path.exists(cap_dir_cam):
-                        try:
-                            os.makedirs(cap_dir_cam)
-                        except OSError:
-                            self.log.critical('Failed to create directory: ' + cap_dir_cam)
-                            sys.exit(1)
+
+                    # Create cam cap dir only if cap_cmd is not False
+                    try:
+                        cap_cmd = self.cam_cfg[iterator]['cap_cmd']
+                    except AttributeError:
+                        cap_cmd = None
+                        self.log.debug('Capture command not found')
+
+                    if cap_cmd is not False:
+                        cap_dir_cam = self.replacer(self.cfg['cap_dir_cam'], iterator)
+                        if not os.path.exists(cap_dir_cam):
+                            try:
+                                os.makedirs(cap_dir_cam)
+                            except OSError:
+                                self.log.critical('Failed to create directory: ' + cap_dir_cam)
+                                sys.exit(1)
+                    # End Create cam cap dir
 
                     self.cam_streamer_start_flag.append(True)
 
