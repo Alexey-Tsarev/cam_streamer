@@ -1,40 +1,34 @@
-# cam_streamer - an easy way to get low-cost video surveillance
+# cam_streamer - an easy way to get a low-cost video surveillance system
 
 This is a second edition of a project:  
-https://github.com/AlexeySofree/cam_streamer_bash
+https://github.com/Alexey-Tsarev/cam_streamer_bash
 
-This is a Python script, which allows capture, store,
+This is a Python script, which allows you to capture, store,
 rotate (remove old data) and restream Web/IP camera streams.  
 It works on "any" PC that has Python, GStreamer, FFmpeg.
 
-It tested and works on Raspberry Pi.
-Video encoding forced by Raspberry Pi hardware acceleration - OpenMAX:  
+It tested and works on Raspberry Pi:
+Video encoding is forced by the "OpenMAX" Raspberry Pi hardware acceleration:
 https://jan.newmarch.name/LinuxSound/Sampled/OpenMAX/
 
-GStreamer is used for video/audio capture and for streaming.  
-All GStreamer's pipelines are in the config files:  
-`cfg/*.cfg`  
-and you can easily change them for your needs.
+GStreamer is used for video/audio captures and cameras streaming.  
 
-Main config file is in the file:  
-`cfg/main.cfg`
+Main config is in the `cfg/main.cfg` file.  
+All GStreamer's pipelines are in the `cfg/*.cfg` files and you can easily change them for your needs.
 
-By default GStreamer streams to Nimble server  
-(https://wmspanel.com/nimble - it's free and it works on Raspberry Pi)  
-via rtmp in flv format: h264 video, aac audio.  
-At the same time the script gets streams using FFmpeg.
+By default GStreamer streams to the Nimble server https://wmspanel.com/nimble (it's free and it works on Raspberry Pi)
+via rtmp in flv format (h264 video, aac audio).  
+And at the same time the script stores streams using FFmpeg.
 
 Nimble server allows to restream captured data via rtsp, http.  
-In this case it easy to add all capturing streams to Ivideon service  
-(Ivideon server is needed in this case):  
-https://ivideon.com  
-and get low-cost video surveillance.
+In this case it's easy to add all capturing streams to the Ivideon service:
+https://ivideon.com (you will need the Ivideon Server installed).
 
-There are two ways to remove old data:
-- keep cameras data less then some size
-- keep free space where cameras data located less than some size
+There are two options to remove old data:
+- keep cameras data less then some desired size
+- keep free space where cameras data is located less than some desired size
 
-This is the `top` command output on Raspberry Pi 2:
+This is the `top` command output on a Raspberry Pi 2:
 ~~~
  top - 11:13:33 up  9:39,  3 users,  load average: 1.97, 1.98, 2.00
  Tasks: 166 total,   1 running, 165 sleeping,   0 stopped,   0 zombie
@@ -58,7 +52,7 @@ In the above example there are 3 USB cameras with the following parameters:
 1498 pid:  640x480 h264 video, no audio
 ~~~
 
-Mostly the same for Raspberry Pi 3:
+Mostly the same for a Raspberry Pi 3:
 ~~~
 $ grep Revision /proc/cpuinfo
 Revision        : a22082
@@ -75,6 +69,17 @@ KiB Swap:  1023996 total,        0 used,  1023996 free.   323548 cached Mem
  1695 pi        20   0  126748  19724  14240 S   7.7  2.6   3:51.37 gst-launch-1.0 v4l2src device=/dev/v4l/by-id/usb-Etron_Technology_+
  1647 pi        20   0  163260  22284  15036 S   4.8  3.0   6:10.85 gst-launch-1.0 v4l2src device=/dev/v4l/by-id/usb-046d_09a4_C9469E2+
  1150 root      20   0  314780  39016   7500 S   3.8  5.2   2:07.54 /usr/bin/nimble -d --conf-dir=/etc/nimble --log-dir=/var/log/nimbl+
+~~~
+
+## Install
+Both: Python 2 and 3 are supported. So just:  
+- instead `pip3` you may use `pip2` or just `pip`  
+and
+- instead `python3` you may use `python2` or just `python`.
+~~~
+pip3 install -r requirements.txt
+python3 cam_streamer.py -log_level INFO -daemon start
+tail -f log/main.log
 ~~~
 ---
 

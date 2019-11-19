@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 import os
 import sys
@@ -50,7 +50,7 @@ class Cam:
 
     def read_main_config(self):
         if os.path.isfile(self.cfg_file):
-            self.cfg.load(file(self.cfg_file))
+            self.cfg.load(open(self.cfg_file))
         else:
             print('Failed to open the file: ' + self.cfg_file)
             sys.exit(1)
@@ -299,7 +299,7 @@ class Cam:
 
         for cur_cam_cfg in cam_cfg_list:
             self.log.debug('Read cam config: ' + cur_cam_cfg)
-            tmp_cfg = Config(file(cur_cam_cfg))
+            tmp_cfg = Config(open(cur_cam_cfg))
             cur_cam_cfg_active_flag = True
 
             try:
@@ -502,16 +502,17 @@ if __name__ == '__main__':
             c.log.debug('[Daemon] Stopping')
             main_pid = c.kill_process(c.pid_file, False)
 
-            kill_time = time.time()
-            killed_flag = False
+            if main_pid:
+                kill_time = time.time()
+                killed_flag = False
 
-            while time.time() - kill_time < 5:
-                if not psutil.pid_exists(main_pid):
-                    killed_flag = True
-                    break
+                while time.time() - kill_time < 5:
+                    if not psutil.pid_exists(main_pid):
+                        killed_flag = True
+                        break
 
-            if not killed_flag:
-                c.log.warn('[Daemon] Time outed waiting process to exit. PID: %i' % main_pid)
+                if not killed_flag:
+                    c.log.warn('[Daemon] Time outed waiting process to exit. PID: %i' % main_pid)
 
         if args.daemon == 'start' or args.daemon == 'restart':
             c.log.debug('[Daemon] Starting from working directory: ' + script_dir)
