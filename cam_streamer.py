@@ -199,7 +199,13 @@ class Cam:
 
     def bg_run(self, cmd, pid_file=None):
         self.log.debug('Running:\n' + cmd)
-        subproc = subprocess.Popen(cmd, shell=True)
+
+        if sys.version_info.major == 2:
+            subproc = subprocess.Popen(cmd, shell=True)
+        else:
+            subproc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+                                       stderr=subprocess.DEVNULL)
+
         self.log.debug('Started PID: %s' % subproc.pid)
 
         if pid_file is not None:
