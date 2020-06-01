@@ -1,6 +1,6 @@
 # pip install -r requirements.txt
 
-config
+config<0.5
 requests
 schedule
 glob2
