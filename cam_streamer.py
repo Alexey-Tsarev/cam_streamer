@@ -36,6 +36,7 @@ class Cam:
     log = logging.getLogger()
     log_handler_file = None
     main_loop_active_flag = True
+    signals_name = {}
 
     def __init__(self, config_dir, config_filename, log_level=None):
         self.cfg_dir = config_dir
@@ -47,6 +48,10 @@ class Cam:
         self.create_dirs()
         self.setup_logging()
         self.pid_file = os.path.join(self.cfg['pid_dir'], self.cfg['pid_filename'])
+
+        for sig in dir(signal):
+            if sig.startswith('SIG') and not sig.startswith('SIG_'):
+                self.signals_name[getattr(signal, sig)] = sig
 
     def read_main_config(self):
         if os.path.isfile(self.cfg_file):
@@ -118,12 +123,7 @@ class Cam:
 
     def exit_handler(self, s, frame, log_signal=True, exit_code=0):
         if log_signal:
-            signals_name = {}
-            for sig in dir(signal):
-                if sig.startswith('SIG') and not sig.startswith('SIG_'):
-                    signals_name[getattr(signal, sig)] = sig
-
-            self.log.warn('Caught signal: ' + signals_name[s])
+            self.log.warning('Caught signal: ' + self.signals_name[s])
 
         self.kill_cams_process()
 
@@ -131,12 +131,26 @@ class Cam:
         if os.path.isfile(self.pid_file):
             os.remove(self.pid_file)
         else:
-            self.log.warn('PID file not found: ' + self.pid_file)
+            self.log.warning('PID file not found: ' + self.pid_file)
 
         if exit_code == 0:
             self.main_loop_active_flag = False
         else:
             sys.exit(exit_code)
+
+    def exit_child(self, s, frame, log_signal=True):
+        while True:
+            try:
+                pid, status = os.waitpid(-1, os.WNOHANG)
+
+                if pid != 0:
+                    logging.warning('Received "%s" signal for "%s" PID with "%s" status' %
+                                    (self.signals_name[s], pid, status))
+                else:
+                    break
+            except ChildProcessError:
+                self.log.debug('ChildProcessError: No child processes')
+                break
 
     def exception_handler(self, *exception_data):
         self.log.critical('Unhandled exception:\n%s', ''.join(traceback.format_exception(*exception_data)))
@@ -158,11 +172,11 @@ class Cam:
                     try:
                         os.kill(pid, signal.SIGTERM)
                     except OSError:
-                        self.log.warn('Failed to kill process: %i' % pid)
+                        self.log.warning('Failed to kill process: %i' % pid)
                 else:
                     self.log.info('Process not found: %i' % pid)
             else:
-                self.log.warn('PID is empty')
+                self.log.warning('PID is empty')
 
             if remove_pid_file:
                 os.remove(pid_file)
@@ -200,11 +214,10 @@ class Cam:
     def bg_run(self, cmd, pid_file=None):
         self.log.debug('Running:\n' + cmd)
 
-        if sys.version_info.major == 2:
-            subproc = subprocess.Popen(cmd, shell=True)
-        else:
-            subproc = subprocess.Popen(cmd, shell=True, stdout=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
-                                       stderr=subprocess.DEVNULL)
+        subproc = subprocess.Popen(cmd, shell=True,
+                                   stdout=subprocess.DEVNULL,
+                                   stdin=subprocess.DEVNULL,
+                                   stderr=subprocess.DEVNULL)
 
         self.log.debug('Started PID: %s' % subproc.pid)
 
@@ -272,7 +285,7 @@ class Cam:
                     if file_size > int(self.cfg['cleaner_force_remove_file_less_bytes']):
                         removes += 1
                     else:
-                        self.log.warn('Removed "%s" file with the "%s" bytes size' % (file_name, file_size))
+                        self.log.warning('Removed "%s" file with the "%s" bytes size' % (file_name, file_size))
 
                     if removes == int(self.cfg['cleaner_max_removes_per_run']):
                         self.log.debug('Max removes reached: ' + self.cfg['cleaner_max_removes_per_run'])
@@ -287,9 +300,10 @@ class Cam:
     def main(self):
         self.log.info('Start')
         self.log.debug('Started: ' + os.path.abspath(__file__))
-        self.log.debug('Setting SIGTERM, SIGINT handlers')
+        self.log.debug('Setting SIGTERM, SIGINT, SIGCHLD handlers')
         signal.signal(signal.SIGTERM, self.exit_handler)
         signal.signal(signal.SIGINT, self.exit_handler)
+        signal.signal(signal.SIGCHLD, self.exit_child)
 
         # Read cam configs
         cam_cfg_dir = os.path.join(self.cfg_dir, self.cfg['cam_cfg_mask'])
@@ -397,8 +411,8 @@ class Cam:
                     if self.cam_streamer[iterator].poll() is None:
                         self.log.debug('Streamer "%s" is alive' % cam['name'])
                     else:
-                        self.log.warn('Streamer "%s" is dead (exit code: %s)' %
-                                      (cam['name'], self.cam_streamer[iterator].returncode))
+                        self.log.warning('Streamer "%s" is dead (exit code: %s)' %
+                                         (cam['name'], self.cam_streamer[iterator].returncode))
                         self.cam_streamer_start_flag[iterator] = True
 
                 # Capturer alive check
@@ -406,8 +420,8 @@ class Cam:
                     if self.cam_capturer[iterator].poll() is None:
                         self.log.debug('Capturer "%s" is alive' % cam['name'])
                     else:
-                        self.log.warn('Capturer "%s" is dead (exit code: %s)' %
-                                      (cam['name'], self.cam_capturer[iterator].returncode))
+                        self.log.warning('Capturer "%s" is dead (exit code: %s)' %
+                                         (cam['name'], self.cam_capturer[iterator].returncode))
                         self.cam_streamer_poll_flag[iterator] = True
                         self.cam_capturer_check_flag[iterator] = False
                 # End Capturer alive check
@@ -432,7 +446,7 @@ class Cam:
                     try:
                         http_code = requests.head(cap_url, timeout=1).status_code
                     except requests.exceptions.RequestException:
-                        self.log.warn('Failed to connect: ' + cap_url)
+                        self.log.warning('Failed to connect: ' + cap_url)
 
                     if http_code != 0:
                         self.log.info('Checked "%s", status: %s' % (cam['name'], http_code))
@@ -444,7 +458,7 @@ class Cam:
                     start_time_delta = time.time() - self.cam_streamer_start_time[iterator]
                     if self.cam_streamer_poll_flag[iterator]:
                         if start_time_delta > cam['max_start_seconds']:
-                            self.log.warn('Time outed waiting data from: ' + cam['name'])
+                            self.log.warning('Time outed waiting data from: ' + cam['name'])
                             self.log.info('Kill: ' + cam['name'])
                             self.kill_cam_processes(iterator, cam_reset_flag=True)
                             self.cam_streamer_start_flag[iterator] = True
@@ -456,7 +470,7 @@ class Cam:
                 # Run capturer
                 if self.cam_capturer_start_flag[iterator]:
                     if self.cam_capturer[iterator] is not None and self.cam_capturer[iterator].poll() is None:
-                        self.log.warn('Capturer "%s" is STILL alive' % cam['name'])
+                        self.log.warning('Capturer "%s" is STILL alive' % cam['name'])
                     else:
                         cap_cmd = None
                         try:
@@ -512,13 +526,16 @@ if __name__ == '__main__':
                 kill_time = time.time()
                 killed_flag = False
 
-                while time.time() - kill_time < 5:
+                timeout = 20
+
+                while time.time() - kill_time < timeout:
                     if not psutil.pid_exists(main_pid):
                         killed_flag = True
                         break
 
                 if not killed_flag:
-                    c.log.warn('[Daemon] Time outed waiting process to exit. PID: %i' % main_pid)
+                    c.log.warning('[Daemon] Time outed waiting process to exit (timeout: "%i" seconds). PID: "%i"' %
+                                  (timeout, main_pid))
 
         if args.daemon == 'start' or args.daemon == 'restart':
             c.log.debug('[Daemon] Starting from working directory: ' + script_dir)

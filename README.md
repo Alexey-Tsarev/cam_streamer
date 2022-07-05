@@ -72,16 +72,35 @@ KiB Swap:  1023996 total,        0 used,  1023996 free.   323548 cached Mem
 ~~~
 
 ## Install
-Both: Python 2 and 3 are supported. So just:  
-- instead `pip3` you may use `pip2` or just `pip`  
-and
-- instead `python3` you may use `python2` or just `python`.
+Python 3 only.
+
+Create a `virtualenv` (not required and depends on you):
+~~~
+virtualenv .venv
+. .venv/bin/activate
+~~~
+
+Install dependencies:
 ~~~
 pip3 install -r requirements.txt
+~~~
+
+## Run
+No `virtualenv`:
+~~~
 python3 cam_streamer.py -log_level INFO -daemon start
+~~~
+
+Run `virtualenv` through wrapper:
+~~~
+./cam_streamer_daemon_cmd.sh restart INFO
+~~~
+
+Logs:
+~~~
 tail -f log/main.log
 ~~~
 ---
 
-Author: Alexey Tsarev.  
-Email:  Tsarev.Alexey at the gmail.com.
+*Author*: Alexey Tsarev  
+*Email*:  Tsarev.Alexey@gmail.com
