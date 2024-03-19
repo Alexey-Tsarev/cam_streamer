@@ -16,8 +16,8 @@ import schedule
 import daemon
 import argparse
 
-cfg_dir = 'cfg'
-cfg_filename = 'main.cfg'
+CFG_DIR = os.getenv('CFG_DIR', 'cfg')
+CFG_FILENAME = os.getenv('CFG_FILENAME', 'main.cfg')
 
 
 class Cam:
@@ -57,7 +57,7 @@ class Cam:
         if os.path.isfile(self.cfg_file):
             self.cfg.load(open(self.cfg_file))
         else:
-            print('Failed to open the file: ' + self.cfg_file)
+            print('Failed to open the file: %s' % self.cfg_file)
             sys.exit(1)
 
     def create_dirs(self):
@@ -96,7 +96,7 @@ class Cam:
         log_handler_stream.setLevel(self.log_level)
 
         self.log_handler_file = logging.handlers.TimedRotatingFileHandler(
-            os.path.join(self.cfg['log_dir'], self.cfg['log_filename']),
+            filename=str(os.path.join(self.cfg['log_dir'], self.cfg['log_filename'])),
             when='midnight')
         self.log_handler_file.setFormatter(logging_formatter)
         self.log_handler_file.setLevel(self.log_level)
@@ -123,15 +123,15 @@ class Cam:
 
     def exit_handler(self, s, frame, log_signal=True, exit_code=0):
         if log_signal:
-            self.log.warning('Caught signal: ' + self.signals_name[s])
+            self.log.warning('Caught signal: %s' % self.signals_name[s])
 
         self.kill_cams_process()
 
-        self.log.debug('Remove own PID file: ' + self.pid_file)
+        self.log.debug('Remove own PID file: %s' % self.pid_file)
         if os.path.isfile(self.pid_file):
             os.remove(self.pid_file)
         else:
-            self.log.warning('PID file not found: ' + self.pid_file)
+            self.log.warning('PID file not found: %s' % self.pid_file)
 
         if exit_code == 0:
             self.main_loop_active_flag = False
@@ -146,6 +146,27 @@ class Cam:
                 if pid != 0:
                     logging.warning('Received "%s" signal for "%s" PID with "%s" status' %
                                     (self.signals_name[s], pid, status))
+
+                    for iterator, cam in enumerate(self.cam_cfg):
+                        # Streamer alive check
+                        if self.cam_streamer[iterator].poll() is None:
+                            self.log.debug('Streamer "%s" is alive' % cam['name'])
+                        else:
+                            self.log.warning('Streamer "%s" is dead (exit code: %s)' %
+                                             (cam['name'], self.cam_streamer[iterator].returncode))
+                            self.cam_streamer_start_flag[iterator] = True
+                        # End Streamer alive check
+
+                        # Capturer alive check
+                        if self.cam_capturer_check_flag[iterator]:
+                            if self.cam_capturer[iterator].poll() is None:
+                                self.log.debug('Capturer "%s" is alive' % cam['name'])
+                            else:
+                                self.log.warning('Capturer "%s" is dead (exit code: %s)' %
+                                                 (cam['name'], self.cam_capturer[iterator].returncode))
+                                self.cam_streamer_poll_flag[iterator] = True
+                                self.cam_capturer_check_flag[iterator] = False
+                        # End Capturer alive check
                 else:
                     break
             except ChildProcessError:
@@ -181,12 +202,12 @@ class Cam:
             if remove_pid_file:
                 os.remove(pid_file)
         else:
-            self.log.debug('Skip kill, PID file not found: ' + pid_file)
+            self.log.debug('Skip kill, PID file not found: %s' % pid_file)
 
         return pid
 
     def kill_cam_processes(self, cam_index, cam_reset_flag=False, kill_streamer_flag=True, kill_capturer_flag=True):
-        self.log.info('Stop cam: ' + self.cam_cfg[cam_index]['name'])
+        self.log.info('Stop cam: %s' % self.cam_cfg[cam_index]['name'])
 
         if kill_capturer_flag:
             self.log.debug('Kill %s capturer' % self.cam_cfg[cam_index]['name'])
@@ -202,8 +223,8 @@ class Cam:
             except AttributeError:
                 self.log.debug('Cam reset command not found. Skip reset')
             else:
-                self.log.info('Resetting cam: ' + self.cam_cfg[cam_index]['name'])
-                self.log.debug('Reset command: ' + self.cam_cfg[cam_index]['reset_cmd'])
+                self.log.info('Resetting cam: %s' % self.cam_cfg[cam_index]['name'])
+                self.log.debug('Reset command: %s' % self.cam_cfg[cam_index]['reset_cmd'])
                 return_code = subprocess.call(self.cam_cfg[cam_index]['reset_cmd'], shell=True)
                 self.log.info('Reseted with exit code: %s' % return_code)
 
@@ -212,7 +233,7 @@ class Cam:
             self.kill_cam_processes(iterator, cam_reset_flag=cam_reset_flag)
 
     def bg_run(self, cmd, pid_file=None):
-        self.log.debug('Running:\n' + cmd)
+        self.log.debug('Running:\n%s' % cmd)
 
         subproc = subprocess.Popen(cmd, shell=True,
                                    stdout=subprocess.DEVNULL,
@@ -279,7 +300,7 @@ class Cam:
             for file_name in store_file_list_sorted.values():
                 if os.path.isfile(file_name):
                     file_size = os.path.getsize(file_name)
-                    self.log.info('Remove file: ' + file_name)
+                    self.log.info('Remove file: %s' % file_name)
                     os.remove(file_name)
 
                     if file_size > int(self.cfg['cleaner_force_remove_file_less_bytes']):
@@ -288,7 +309,7 @@ class Cam:
                         self.log.warning('Removed "%s" file with the "%s" bytes size' % (file_name, file_size))
 
                     if removes == int(self.cfg['cleaner_max_removes_per_run']):
-                        self.log.debug('Max removes reached: ' + self.cfg['cleaner_max_removes_per_run'])
+                        self.log.debug('Max removes reached: %s' % self.cfg['cleaner_max_removes_per_run'])
                         break
 
         self.log.debug('Cleaner finished')
@@ -299,7 +320,7 @@ class Cam:
 
     def main(self):
         self.log.info('Start')
-        self.log.debug('Started: ' + os.path.abspath(__file__))
+        self.log.debug('Started: %s' % os.path.abspath(__file__))
         self.log.debug('Setting SIGTERM, SIGINT, SIGCHLD handlers')
         signal.signal(signal.SIGTERM, self.exit_handler)
         signal.signal(signal.SIGINT, self.exit_handler)
@@ -307,7 +328,7 @@ class Cam:
 
         # Read cam configs
         cam_cfg_dir = os.path.join(self.cfg_dir, self.cfg['cam_cfg_mask'])
-        self.log.debug('Configs search path: ' + cam_cfg_dir)
+        self.log.debug('Configs search path: %s' % cam_cfg_dir)
 
         cam_cfg_list = glob2.glob(os.path.join(self.cfg_dir, self.cfg['cam_cfg_mask']))
         cam_cfg_list.remove(self.cfg_file)
@@ -318,7 +339,7 @@ class Cam:
             sys.exit(0)
 
         for cur_cam_cfg in cam_cfg_list:
-            self.log.debug('Read cam config: ' + cur_cam_cfg)
+            self.log.debug('Read cam config: %s' % cur_cam_cfg)
             tmp_cfg = Config(open(cur_cam_cfg))
             cur_cam_cfg_active_flag = True
 
@@ -338,9 +359,9 @@ class Cam:
                 for key in self.cam_cfg_resolver_dict:
                     self.cam_cfg[-1][key] = self.cam_cfg_resolver_dict[key]
 
-                self.log.debug('Loaded settings for: ' + self.cam_cfg[-1]['name'])
+                self.log.debug('Loaded settings for: %s' % self.cam_cfg[-1]['name'])
             else:
-                self.log.debug('Cam config is skipped due active flag: ' + cur_cam_cfg)
+                self.log.debug('Cam config is skipped due active flag: %s' % cur_cam_cfg)
         # End Read cam configs
 
         # Cleaner
@@ -353,7 +374,7 @@ class Cam:
             try:
                 pid_streamer = cam['pid_streamer']
             except AttributeError:
-                self.log.debug('pid_streamer not found for cam: ' + cam['name'])
+                self.log.debug('pid_streamer not found for cam: %s' % cam['name'])
                 try:
                     pid_streamer = self.cfg['pid_streamer']
                 except AttributeError:
@@ -363,7 +384,7 @@ class Cam:
             try:
                 pid_capturer = cam['pid_capturer']
             except AttributeError:
-                self.log.debug('pid_capturer not found for cam: ' + cam['name'])
+                self.log.debug('pid_capturer not found for cam: %s' % cam['name'])
                 try:
                     pid_capturer = self.cfg['pid_capturer']
                 except AttributeError:
@@ -380,7 +401,6 @@ class Cam:
         while self.main_loop_active_flag:
             for iterator, cam in enumerate(self.cam_cfg):
                 if len(self.cam_streamer) == iterator:
-
                     # Create cam cap dir only if cap_cmd is not False
                     try:
                         cap_cmd = self.cam_cfg[iterator]['cap_cmd']
@@ -394,7 +414,7 @@ class Cam:
                             try:
                                 os.makedirs(cap_dir_cam)
                             except OSError:
-                                self.log.critical('Failed to create directory: ' + cap_dir_cam)
+                                self.log.critical('Failed to create directory: %s' % cap_dir_cam)
                                 sys.exit(1)
                     # End Create cam cap dir
 
@@ -407,24 +427,6 @@ class Cam:
                     self.cam_capturer.append(None)
                     self.cam_capturer_start_flag.append(False)
                     self.cam_capturer_check_flag.append(False)
-                else:
-                    if self.cam_streamer[iterator].poll() is None:
-                        self.log.debug('Streamer "%s" is alive' % cam['name'])
-                    else:
-                        self.log.warning('Streamer "%s" is dead (exit code: %s)' %
-                                         (cam['name'], self.cam_streamer[iterator].returncode))
-                        self.cam_streamer_start_flag[iterator] = True
-
-                # Capturer alive check
-                if self.cam_capturer_check_flag[iterator]:
-                    if self.cam_capturer[iterator].poll() is None:
-                        self.log.debug('Capturer "%s" is alive' % cam['name'])
-                    else:
-                        self.log.warning('Capturer "%s" is dead (exit code: %s)' %
-                                         (cam['name'], self.cam_capturer[iterator].returncode))
-                        self.cam_streamer_poll_flag[iterator] = True
-                        self.cam_capturer_check_flag[iterator] = False
-                # End Capturer alive check
 
                 # Run streamer
                 if self.cam_streamer_start_flag[iterator]:
@@ -440,13 +442,13 @@ class Cam:
                     cap_url = self.cfg['cap_url']
                     cap_url = self.replacer(cap_url, iterator)
 
-                    self.log.debug('Getting HTTP status: ' + cap_url)
+                    self.log.debug('Getting HTTP status: %s' % cap_url)
                     http_code = 0
 
                     try:
                         http_code = requests.head(cap_url, timeout=1).status_code
                     except requests.exceptions.RequestException:
-                        self.log.warning('Failed to connect: ' + cap_url)
+                        self.log.warning('Failed to connect: %s' % cap_url)
 
                     if http_code != 0:
                         self.log.info('Checked "%s", status: %s' % (cam['name'], http_code))
@@ -458,8 +460,8 @@ class Cam:
                     start_time_delta = time.time() - self.cam_streamer_start_time[iterator]
                     if self.cam_streamer_poll_flag[iterator]:
                         if start_time_delta > cam['max_start_seconds']:
-                            self.log.warning('Time outed waiting data from: ' + cam['name'])
-                            self.log.info('Kill: ' + cam['name'])
+                            self.log.warning('Time outed waiting data from: %s' % cam['name'])
+                            self.log.info('Kill: %s' % cam['name'])
                             self.kill_cam_processes(iterator, cam_reset_flag=True)
                             self.cam_streamer_start_flag[iterator] = True
                         else:
@@ -484,6 +486,11 @@ class Cam:
                                 self.exit_handler(None, None, log_signal=False, exit_code=1)
 
                         if cap_cmd is not False:
+                            try:
+                                cap_cmd = cap_cmd + " " + self.cam_cfg[iterator]['cap_cmd_suffix']
+                            except AttributeError:
+                                pass
+
                             cap_cmd = self.replacer(cap_cmd, iterator)
 
                             self.log.info('Run "%s" capturer in background' % cam['name'])
@@ -513,9 +520,9 @@ if __name__ == '__main__':
     os.chdir(script_dir)
 
     if args.log_level:
-        c = Cam(cfg_dir, cfg_filename, args.log_level)
+        c = Cam(CFG_DIR, CFG_FILENAME, args.log_level)
     else:
-        c = Cam(cfg_dir, cfg_filename)
+        c = Cam(CFG_DIR, CFG_FILENAME)
 
     if args.daemon:
         if args.daemon == 'stop' or args.daemon == 'restart':
@@ -538,7 +545,7 @@ if __name__ == '__main__':
                                   (timeout, main_pid))
 
         if args.daemon == 'start' or args.daemon == 'restart':
-            c.log.debug('[Daemon] Starting from working directory: ' + script_dir)
+            c.log.debug('[Daemon] Starting from working directory: %s' % script_dir)
             with daemon.DaemonContext(working_directory=script_dir, files_preserve=[c.log_handler_file.stream]):
                 c.main()
     else:
