@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import sys
@@ -138,40 +138,19 @@ class Cam:
         else:
             sys.exit(exit_code)
 
-    def exit_child(self, s, frame, log_signal=True):
-        while True:
-            try:
-                pid, status = os.waitpid(-1, os.WNOHANG)
-
-                if pid != 0:
-                    logging.warning('Received "%s" signal for "%s" PID with "%s" status' %
-                                    (self.signals_name[s], pid, status))
-
-                    for iterator, cam in enumerate(self.cam_cfg):
-                        # Streamer alive check
-                        if self.cam_streamer[iterator].poll() is None:
-                            self.log.debug('Streamer "%s" is alive' % cam['name'])
-                        else:
-                            self.log.warning('Streamer "%s" is dead (exit code: %s)' %
-                                             (cam['name'], self.cam_streamer[iterator].returncode))
-                            self.cam_streamer_start_flag[iterator] = True
-                        # End Streamer alive check
-
-                        # Capturer alive check
-                        if self.cam_capturer_check_flag[iterator]:
-                            if self.cam_capturer[iterator].poll() is None:
-                                self.log.debug('Capturer "%s" is alive' % cam['name'])
-                            else:
-                                self.log.warning('Capturer "%s" is dead (exit code: %s)' %
-                                                 (cam['name'], self.cam_capturer[iterator].returncode))
-                                self.cam_streamer_poll_flag[iterator] = True
-                                self.cam_capturer_check_flag[iterator] = False
-                        # End Capturer alive check
-                else:
-                    break
-            except ChildProcessError:
-                self.log.debug('ChildProcessError: No child processes')
-                break
+    # def exit_child(self, s, frame, log_signal=True):
+    #     while True:
+    #         try:
+    #             pid, status = os.waitpid(-1, os.WNOHANG)
+    #
+    #             if pid != 0:
+    #                 logging.warning('Received "%s" signal for "%s" PID with "%s" status' %
+    #                                 (self.signals_name[s], pid, status))
+    #             else:
+    #                 break
+    #         except ChildProcessError:
+    #             self.log.debug('ChildProcessError: No child processes')
+    #             break
 
     def exception_handler(self, *exception_data):
         self.log.critical('Unhandled exception:\n%s', ''.join(traceback.format_exception(*exception_data)))
@@ -324,7 +303,9 @@ class Cam:
         self.log.debug('Setting SIGTERM, SIGINT, SIGCHLD handlers')
         signal.signal(signal.SIGTERM, self.exit_handler)
         signal.signal(signal.SIGINT, self.exit_handler)
-        signal.signal(signal.SIGCHLD, self.exit_child)
+
+        ## Commented because of: RuntimeError: reentrant call inside <_io.BufferedWriter name='<stderr>'>
+        # signal.signal(signal.SIGCHLD, self.exit_child)
 
         # Read cam configs
         cam_cfg_dir = os.path.join(self.cfg_dir, self.cfg['cam_cfg_mask'])
@@ -427,6 +408,24 @@ class Cam:
                     self.cam_capturer.append(None)
                     self.cam_capturer_start_flag.append(False)
                     self.cam_capturer_check_flag.append(False)
+                else:
+                    if self.cam_streamer[iterator].poll() is None:
+                        self.log.debug('Streamer "%s" is alive' % cam['name'])
+                    else:
+                        self.log.warning('Streamer "%s" is dead (exit code: %s)' %
+                                         (cam['name'], self.cam_streamer[iterator].returncode))
+                        self.cam_streamer_start_flag[iterator] = True
+
+                # Capturer alive check
+                if self.cam_capturer_check_flag[iterator]:
+                    if self.cam_capturer[iterator].poll() is None:
+                        self.log.debug('Capturer "%s" is alive' % cam['name'])
+                    else:
+                        self.log.warning('Capturer "%s" is dead (exit code: %s)' %
+                                         (cam['name'], self.cam_capturer[iterator].returncode))
+                        self.cam_streamer_poll_flag[iterator] = True
+                        self.cam_capturer_check_flag[iterator] = False
+                # End Capturer alive check
 
                 # Run streamer
                 if self.cam_streamer_start_flag[iterator]:

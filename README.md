@@ -76,8 +76,8 @@ Python 3 only.
 
 Create a `virtualenv` (not required and depends on you):
 ~~~
-virtualenv .venv
-. .venv/bin/activate
+virtualenv .virtualenv
+. .virtualenv/bin/activate
 ~~~
 
 Install dependencies:
