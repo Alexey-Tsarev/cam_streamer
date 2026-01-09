@@ -50,6 +50,11 @@ Image: https://hub.docker.com/r/alexeytsarev/cam_streamer
 ```
 docker run --rm alexeytsarev/cam_streamer
 ```
+or get this project: https://github.com/Alexey-Tsarev/dockered and run:
+```
+cd images
+docker compose up ome cam_streamer
+```
 ---
 
 Good luck,  
