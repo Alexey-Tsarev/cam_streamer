@@ -324,7 +324,9 @@ class Cam:
                                    (cam_dir, file, ts,
                                     dt, dt_diff, dt_diff_seconds))
 
-                    # if dt_diff_seconds < self.cfg['recording_checker_rerun_streamer_on_dt_diff_less_seconds']:
+                    if dt_diff_seconds > int(self.cfg['recording_checker_rerun_streamer_on_dt_diff_less_seconds']):
+                        self.log.warning('Found the latest file: %s, diff seconds: %s' % (file, dt_diff_seconds))
+                        self.kill_cam_processes(iterator, cam_reset_flag=True)
                 else:
                     self.log.debug('Search failed for path: %s' % cam_dir)
 
