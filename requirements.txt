@@ -1,11 +1,12 @@
 # pip install -r requirements.txt
 
-config<0.5
-requests
-schedule
+argparse
+config < 0.5
+daemon
 glob2
 psutil
-sortedcontainers
-daemon
 python-daemon
-argparse
+python-strtobool
+requests
+schedule
+sortedcontainers

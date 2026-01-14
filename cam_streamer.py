@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 
-import os
-import sys
 from config import Config, ConfigMerger
 from sortedcontainers import SortedDict
-import logging.handlers
-import signal
-import glob2
-import psutil
-import time
-import subprocess
-import traceback
-import schedule
-import daemon
+from str_to_bool import str_to_bool
 import argparse
+import daemon
+import datetime
+import glob2
+import logging.handlers
+import os
+import psutil
+import schedule
+import signal
+import subprocess
+import sys
+import time
+import traceback
 
 CFG_DIR = os.getenv('CFG_DIR', 'cfg')
 CFG_FILENAME = os.getenv('CFG_FILENAME', 'main.cfg')
@@ -140,7 +142,7 @@ class Cam:
 
                 if pid != 0:
                     self.log.warning('Received "%s" signal for "%s" PID with "%s" status' %
-                                    (self.signals_name[s], pid, status))
+                                     (self.signals_name[s], pid, status))
                 else:
                     break
             except ChildProcessError:
@@ -222,25 +224,38 @@ class Cam:
         s = s.replace('[cams_number]', str(len(self.cam_cfg)))
         return s
 
+    def get_store_files_list(self):
+        store_files_list = glob2.glob(os.path.join(self.cfg['cap_dir'], '**'))
+        self.log.debug('Found files: %s' % store_files_list)
+        return store_files_list
+
+    def get_store_files_list_sorted(self, store_files_list):
+        store_files_list_sorted = SortedDict()
+        for store_file in store_files_list:
+            store_files_list_sorted.update({os.path.getmtime(store_file): store_file})
+
+        self.log.debug('Sorted files list: %s' % store_files_list_sorted)
+
+        return store_files_list_sorted
+
     def cleaner(self):
         self.log.debug('Cleaner started')
         clean_flag = False
-        store_file_list = None
+        store_files_list = None
 
         if int(self.cfg['cleaner_store_max_gb']) != 0:
-            store_file_list = glob2.glob(os.path.join(self.cfg['cap_dir'], '**'))
-            self.log.debug('Found files: %s' % store_file_list)
+            store_files_list = self.get_store_files_list()
 
-            store_file_total_size_bytes = 0
-            for store_file in store_file_list:
-                store_file_total_size_bytes += os.path.getsize(store_file)
+            store_files_total_size_bytes = 0
+            for store_file in store_files_list:
+                store_files_total_size_bytes += os.path.getsize(store_file)
 
-            store_file_total_size_gigabytes = 1.0 * store_file_total_size_bytes / 1024 / 1024 / 1024
-            self.log.debug('Store files size, GB: %.3f' % store_file_total_size_gigabytes)
+            store_files_total_size_gigabytes = 1.0 * store_files_total_size_bytes / 1024 / 1024 / 1024
+            self.log.debug('Store files size, GB: %.3f' % store_files_total_size_gigabytes)
 
-            if store_file_total_size_gigabytes > float(self.cfg['cleaner_store_max_gb']):
+            if store_files_total_size_gigabytes > float(self.cfg['cleaner_store_max_gb']):
                 self.log.info('Current store size / Configured max store size, GB: %.3f/%.3f' %
-                              (store_file_total_size_gigabytes, self.cfg['cleaner_store_max_gb']))
+                              (store_files_total_size_gigabytes, self.cfg['cleaner_store_max_gb']))
                 clean_flag = True
 
         if int(self.cfg['cleaner_store_keep_free_gb']) != 0:
@@ -256,21 +271,16 @@ class Cam:
         if clean_flag:
             self.log.info('Clean is active')
 
-            if store_file_list is None:
-                store_file_list = glob2.glob(os.path.join(self.cfg['cap_dir'], '**'))
+            if store_files_list is None:
+                store_files_list = self.get_store_files_list()
 
-            store_file_list_sorted = SortedDict()
-            for store_file in store_file_list:
-                store_file_list_sorted.update({os.path.getmtime(store_file): store_file})
-
-            self.log.debug('Sorted files list (with last modification date): %s' % store_file_list_sorted)
-            self.log.debug('Sorted files list (by last modification date): %s' % store_file_list_sorted.values())
+            store_files_list_sorted = self.get_store_files_list_sorted(store_files_list)
 
             removes = 0
-            for file_name in store_file_list_sorted.values():
+            for file_name in store_files_list_sorted.values():
                 if os.path.isfile(file_name):
                     file_size = os.path.getsize(file_name)
-                    self.log.info('Remove file: %s' % file_name)
+                    self.log.info('Remove file: %s, file size: %s' % (file_name, file_size))
                     os.remove(file_name)
 
                     if file_size > int(self.cfg['cleaner_force_remove_file_less_bytes']):
@@ -283,6 +293,42 @@ class Cam:
                         break
 
         self.log.debug('Cleaner finished')
+
+    def recording_checker(self):
+        self.log.debug('Recording checker started')
+        store_files_list = self.get_store_files_list()
+        store_files_list_sorted = self.get_store_files_list_sorted(store_files_list)
+        store_files_list_sorted_reversed = list(reversed(store_files_list_sorted.items()))
+        self.log.debug('Reverse sorted files list: %s' % store_files_list_sorted_reversed)
+
+        for iterator, cam in enumerate(self.cam_cfg):
+            if self.cam_streamer_poll_flag[iterator] is True:
+                cam_dir = os.path.join(self.cfg['cap_dir'], cam['name'], '')
+                self.log.debug('Search the latest file for path: %s' % cam_dir)
+
+                ts = None
+                file = None
+                file_found_flag = False
+
+                for ts, file in store_files_list_sorted_reversed:
+                    if file.startswith(cam_dir):
+                        file_found_flag = True
+                        break
+
+                if file_found_flag:
+                    dt = datetime.datetime.fromtimestamp(ts)
+                    dt_diff = datetime.datetime.now() - dt
+                    dt_diff_seconds = dt_diff.total_seconds()
+                    self.log.debug('Found the latest file for path: %s, file: %s, ts: %s, '
+                                   'dt: %s, diff: %s, diff seconds: %s' %
+                                   (cam_dir, file, ts,
+                                    dt, dt_diff, dt_diff_seconds))
+
+                    # if dt_diff_seconds < self.cfg['recording_checker_rerun_streamer_on_dt_diff_less_seconds']:
+                else:
+                    self.log.debug('Search failed for path: %s' % cam_dir)
+
+        self.log.debug('Recording checker finished')
 
     def configs_resolver(self, map1, map2, key):
         self.cam_cfg_resolver_dict[key] = map1[key]
@@ -335,9 +381,15 @@ class Cam:
         # End Read configs
 
         # Cleaner
-        self.cfg['cleaner_max_removes_per_run'] = self.replacer(str(self.cfg['cleaner_max_removes_per_run']), 0)
-        schedule.every(self.cfg['cleaner_run_every_minutes']).minutes.do(self.cleaner)
+        if str_to_bool(self.cfg['cleaner_active']):
+            self.cfg['cleaner_max_removes_per_run'] = self.replacer(str(self.cfg['cleaner_max_removes_per_run']), 0)
+            schedule.every(self.cfg['cleaner_run_every_minutes']).minutes.do(self.cleaner)
         # End Cleaner
+
+        # Recording checker
+        if str_to_bool(self.cfg['recording_checker_active']):
+            schedule.every(self.cfg['recording_checker_run_every_minutes']).minutes.do(self.recording_checker)
+        # End Recording checker
 
         # PIDs full path
         for iterator, cam in enumerate(self.cam_cfg):
