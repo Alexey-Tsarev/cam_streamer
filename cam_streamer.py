@@ -135,19 +135,19 @@ class Cam:
         else:
             sys.exit(exit_code)
 
-    def exit_child(self, s, frame, log_signal=True):
-        while True:
-            try:
-                pid, status = os.waitpid(-1, os.WNOHANG)
-
-                if pid != 0:
-                    self.log.warning('Received "%s" signal for "%s" PID with "%s" status' %
-                                     (self.signals_name[s], pid, status))
-                else:
-                    break
-            except ChildProcessError:
-                self.log.debug('ChildProcessError: No child processes')
-                break
+    # def exit_child(self, s, frame, log_signal=True):
+    #     while True:
+    #         try:
+    #             pid, status = os.waitpid(-1, os.WNOHANG)
+    #
+    #             if pid != 0:
+    #                 self.log.warning('Received "%s" signal for "%s" PID with "%s" status' %
+    #                                  (self.signals_name[s], pid, status))
+    #             else:
+    #                 break
+    #         except ChildProcessError:
+    #             self.log.debug('ChildProcessError: No child processes')
+    #             break
 
     def exception_handler(self, *exception_data):
         self.log.critical('Unhandled exception:\n%s', ''.join(traceback.format_exception(*exception_data)))
@@ -342,9 +342,12 @@ class Cam:
         self.log.debug('Set SIGTERM, SIGINT, SIGCHLD handlers')
         signal.signal(signal.SIGTERM, self.exit_handler)
         signal.signal(signal.SIGINT, self.exit_handler)
-        signal.signal(signal.SIGCHLD, self.exit_child)
 
-        # Read configs
+        # `exit_child` commented because of:
+        # RuntimeError: reentrant call inside <_io.BufferedWriter name='<stderr>'>
+        # signal.signal(signal.SIGCHLD, self.exit_child)
+
+        # Read cam configs
         cam_cfg_dir = os.path.join(self.cfg_dir, self.cfg['cam_cfg_mask'])
         self.log.debug('Configs search path: %s' % cam_cfg_dir)
 
