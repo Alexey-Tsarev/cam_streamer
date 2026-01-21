@@ -232,7 +232,12 @@ class Cam:
     def get_store_files_list_sorted(self, store_files_list):
         store_files_list_sorted = SortedDict()
         for store_file in store_files_list:
-            store_files_list_sorted.update({os.path.getmtime(store_file): store_file})
+            mtime = os.path.getmtime(store_file)
+
+            if mtime not in store_files_list_sorted:
+                store_files_list_sorted[mtime] = []
+
+            store_files_list_sorted[mtime].append(store_file)
 
         self.log.debug('Sorted files list: %s' % store_files_list_sorted)
 
@@ -310,9 +315,13 @@ class Cam:
                 file = None
                 file_found_flag = False
 
-                for ts, file in store_files_list_sorted_reversed:
-                    if file.startswith(cam_dir):
-                        file_found_flag = True
+                for ts, files in store_files_list_sorted_reversed:
+                    for file in files:
+                        if file.startswith(cam_dir):
+                            file_found_flag = True
+                            break
+
+                    if file_found_flag:
                         break
 
                 if file_found_flag:
