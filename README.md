@@ -21,26 +21,29 @@ via rtmp in flv format (h264 video, aac audio). And at the same time the OvenMed
 So the script does not save streamed data, instead of previous version: https://github.com/Alexey-Tsarev/cam_streamer/tree/dev
 
 ## Install
-Python 3 only.
+To use this project, you need [uv](https://docs.astral.sh/uv/getting-started/installation/) installed.
 
-Create a `virtualenv` (not required and depends on you):
+## Run
 ~~~
-python3 -m venv .virtualenv
-# virtualenv .virtualenv
-. .virtualenv/bin/activate
-~~~
+./cam_streamer.py --help
+usage: cam_streamer.py [-h] [-daemon {start,stop,restart}] [-log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}]
 
-Install dependencies:
-~~~
-pip3 install -r requirements.txt
-~~~
-
-Run `virtualenv` through wrapper:
-~~~
-./cam_streamer_daemon.sh restart INFO
+options:
+  -h, --help            show this help message and exit
+  -daemon {start,stop,restart}
+                        Daemon mode startup options
+  -log_level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+                        Override config log_level
 ~~~
 
-Logs:
+~~~
+./cam_streamer_daemon.sh -daemon restart -log_level INFO
+script_dir: /Users/atsarev/devv/cam_streamer
+Run cam_streamer.py
++ /Users/atsarev/devv/cam_streamer/cam_streamer.py -daemon restart -log_level INFO
+~~~
+
+## Logs
 ~~~
 tail -f log/main.log
 ~~~

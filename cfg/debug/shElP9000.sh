@@ -27,3 +27,6 @@ IP="${IP:-${name}}"
             ! mux.audio \
         flvmux name=mux \
             ! rtmpsink location="rtmp://127.0.0.1/app/${name}"
+
+# ffplay http://127.0.0.1:3333/app/shElP9000/master.m3u8
+# ffplay http://127.0.0.1:3333/app/shelP9000/master.m3u8

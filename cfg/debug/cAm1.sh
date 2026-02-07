@@ -29,3 +29,6 @@ name=cAm1
             ! mux.audio \
         flvmux name=mux \
             ! rtmpsink location="rtmp://10.1.7.2/app/${name}"
+
+# ffplay http://10.1.7.2:3333/app/cAm1/master.m3u8
+# ffplay http://10.1.7.2:3333/app/cam1/master.m3u8
